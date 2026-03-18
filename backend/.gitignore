@@ -35,6 +35,8 @@ postgres-data/
 dist/
 build/
 
+docker-compose.yml
+
 # ===============================
 # IDE / EDITOR
 # ===============================

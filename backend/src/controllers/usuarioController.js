@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import bcrypt from "bcrypt";
 
 // CRIAR USUARIO
 export const criarUsuario = async (req, res) => {
@@ -6,37 +7,44 @@ export const criarUsuario = async (req, res) => {
         const { nome, email, senha, tipo, cidade_id } = req.body;
 
         if (!nome || !email || !senha || !cidade_id) {
-        return res.status(400).json({ erro: "Campos obrigatórios não enviados" });
+            return res.status(400).json({ erro: "Campos obrigatórios não enviados" });
         }
 
         const emailExistente = await pool.query(
-        "SELECT id FROM usuarios WHERE email = $1 AND cidade_id = $2",
-        [email, cidade_id]
+            "SELECT id FROM usuarios WHERE email = $1 AND cidade_id = $2",
+            [email, cidade_id]
         );
 
         if (emailExistente.rows.length > 0) {
-        return res.status(400).json({ erro: "Email já cadastrado nesta cidade" });
+            return res.status(400).json({ erro: "Email já cadastrado nesta cidade" });
         }
 
+        // 🔐 HASH DA SENHA
+        const senhaHash = await bcrypt.hash(senha, 10);
+
         const novoUsuario = await pool.query(
-        `INSERT INTO usuarios (nome, email, senha, tipo, cidade_id)
-        VALUES ($1,$2,$3,$4,$5)
-        RETURNING *`,
-        [nome, email, senha, tipo || "cliente", cidade_id]
+            `INSERT INTO usuarios (nome, email, senha, tipo, cidade_id)
+            VALUES ($1,$2,$3,$4,$5)
+            RETURNING id, nome, email, tipo, cidade_id`,
+            [nome, email, senhaHash, tipo || "CLIENTE", cidade_id]
         );
 
         res.status(201).json(novoUsuario.rows[0]);
 
-        } catch (erro) {
+    } catch (erro) {
         console.error("Erro ao criar usuário:", erro);
         res.status(500).json({ erro: erro.message });
     }
-    };
+};
 
-    // LISTAR USUARIOS
-    export const listarUsuarios = async (req, res) => {
+
+// LISTAR USUARIOS
+export const listarUsuarios = async (req, res) => {
     try {
-        const usuarios = await pool.query("SELECT * FROM usuarios ORDER BY id");
+
+        const usuarios = await pool.query(
+            "SELECT id, nome, email, tipo, cidade_id FROM usuarios ORDER BY id"
+        );
 
         res.json(usuarios.rows);
 
@@ -44,20 +52,21 @@ export const criarUsuario = async (req, res) => {
         console.error("Erro ao listar usuários:", erro);
         res.status(500).json({ erro: "Erro interno do servidor" });
     }
-    };
+};
 
-    // BUSCAR POR ID
-    export const buscarUsuarioPorId = async (req, res) => {
+
+// BUSCAR POR ID
+export const buscarUsuarioPorId = async (req, res) => {
     try {
         const { id } = req.params;
 
         const usuario = await pool.query(
-        "SELECT * FROM usuarios WHERE id = $1",
-        [id]
+            "SELECT id, nome, email, tipo, cidade_id FROM usuarios WHERE id = $1",
+            [id]
         );
 
         if (usuario.rows.length === 0) {
-        return res.status(404).json({ erro: "Usuário não encontrado" });
+            return res.status(404).json({ erro: "Usuário não encontrado" });
         }
 
         res.json(usuario.rows[0]);
@@ -68,26 +77,32 @@ export const criarUsuario = async (req, res) => {
     }
 };
 
+
 // ATUALIZAR
 export const atualizarUsuario = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nome, email, senha, tipo } = req.body;
+        let { nome, email, senha, tipo } = req.body;
+
+        // 🔐 se enviar nova senha, gerar novo hash
+        if (senha) {
+            senha = await bcrypt.hash(senha, 10);
+        }
 
         const usuario = await pool.query(
-        `UPDATE usuarios
-        SET
-            nome = COALESCE($1,nome),
-            email = COALESCE($2,email),
-            senha = COALESCE($3,senha),
-            tipo = COALESCE($4,tipo)
-        WHERE id = $5
-        RETURNING *`,
-        [nome, email, senha, tipo, id]
+            `UPDATE usuarios
+            SET
+                nome = COALESCE($1,nome),
+                email = COALESCE($2,email),
+                senha = COALESCE($3,senha),
+                tipo = COALESCE($4,tipo)
+            WHERE id = $5
+            RETURNING id, nome, email, tipo, cidade_id`,
+            [nome, email, senha, tipo, id]
         );
 
         if (usuario.rows.length === 0) {
-        return res.status(404).json({ erro: "Usuário não encontrado" });
+            return res.status(404).json({ erro: "Usuário não encontrado" });
         }
 
         res.json(usuario.rows[0]);
@@ -98,18 +113,19 @@ export const atualizarUsuario = async (req, res) => {
     }
 };
 
+
 // DELETAR
 export const deletarUsuario = async (req, res) => {
     try {
         const { id } = req.params;
 
         const usuario = await pool.query(
-        "DELETE FROM usuarios WHERE id = $1 RETURNING *",
-        [id]
+            "DELETE FROM usuarios WHERE id = $1 RETURNING id",
+            [id]
         );
 
         if (usuario.rows.length === 0) {
-        return res.status(404).json({ erro: "Usuário não encontrado" });
+            return res.status(404).json({ erro: "Usuário não encontrado" });
         }
 
         res.json({ mensagem: "Usuário deletado com sucesso" });

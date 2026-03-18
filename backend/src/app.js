@@ -7,7 +7,9 @@ import planoRoutes from "./routes/planoRoutes.js";
 import restauranteRoutes from "./routes/restauranteRoutes.js";
 import pratoRoutes from "./routes/pratoRoutes.js";
 import assinaturaRoutes from "./routes/assinaturaRoutes.js";
-import pagamentosRoutes from "./routes/pagamentosRoutes.js"
+import pagamentosRoutes from "./routes/pagamentosRoutes.js";
+import resgatesRoutes from "./routes/resgatesRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
@@ -20,6 +22,8 @@ app.use("/planos", planoRoutes);
 app.use("/restaurantes", restauranteRoutes);
 app.use("/pratos", pratoRoutes);
 app.use("/assinaturas", assinaturaRoutes);
-app.use("/pagamentos", pagamentosRoutes)
+app.use("/pagamentos", pagamentosRoutes);
+app.use("/resgates", resgatesRoutes);
+app.use("/auth", authRoutes);
 
 export default app;

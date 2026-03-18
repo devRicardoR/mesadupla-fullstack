@@ -5,11 +5,11 @@ export const criarPagamento = async (req, res) => {
     try {
 
         const {
-        cidade_id,
-        usuario_id,
-        assinatura_id,
-        valor,
-        metodo_pagamento
+            cidade_id,
+            usuario_id,
+            assinatura_id,
+            valor,
+            metodo_pagamento
         } = req.body
 
         const result = await db.query(
@@ -56,7 +56,7 @@ export const buscarPagamento = async (req, res) => {
         )
 
         if (result.rows.length === 0) {
-        return res.status(404).json({ erro: "Pagamento não encontrado" })
+            return res.status(404).json({ erro: "Pagamento não encontrado" })
         }
 
         res.json(result.rows[0])
@@ -74,24 +74,42 @@ export const atualizarPagamento = async (req, res) => {
         const { id } = req.params
 
         const {
-        status_pagamento,
-        id_pagamento_gateway
+            status_pagamento,
+            id_pagamento_gateway
         } = req.body
 
         const result = await db.query(
         `UPDATE pagamentos SET
-            status_pagamento = COALESCE($1, status_pagamento),
-            id_pagamento_gateway = COALESCE($2, id_pagamento_gateway)
+            status = COALESCE($1, status),
+            id_pagamento_gateway = COALESCE($2, id_pagamento_gateway),
+            pago_em = CASE 
+                WHEN $1 = 'APROVADO' THEN NOW()
+                ELSE pago_em
+            END
         WHERE id = $3
         RETURNING *`,
         [status_pagamento, id_pagamento_gateway, id]
         )
 
         if (result.rows.length === 0) {
-        return res.status(404).json({ erro: "Pagamento não encontrado" })
+            return res.status(404).json({ erro: "Pagamento não encontrado" })
         }
 
-        res.json(result.rows[0])
+        const pagamento = result.rows[0]
+
+        // regra de negócio: ativar assinatura
+        if (status_pagamento === "APROVADO") {
+
+            await db.query(
+            `UPDATE assinaturas
+            SET status = 'ATIVA'
+            WHERE id = $1`,
+            [pagamento.assinatura_id]
+            )
+
+        }
+
+        res.json(pagamento)
 
     } catch (error) {
         console.error(error)
@@ -113,12 +131,12 @@ export const deletarPagamento = async (req, res) => {
         )
 
         if (result.rows.length === 0) {
-        return res.status(404).json({ erro: "Pagamento não encontrado" })
+            return res.status(404).json({ erro: "Pagamento não encontrado" })
         }
 
         res.json({
-        mensagem: "Pagamento deletado",
-        pagamento: result.rows[0]
+            mensagem: "Pagamento deletado",
+            pagamento: result.rows[0]
         })
 
     } catch (error) {
